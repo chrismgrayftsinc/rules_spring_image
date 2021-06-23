@@ -51,7 +51,6 @@ def _dependencies_copier_rule_impl(ctx):
         for file in dep.files.to_list():
             path = file.path
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
-                print("found loader", path)
                 continue
             else:
                 if path.find("external") >= 0 and path.find("maven2", path.find("external")) >= 0:
@@ -99,7 +98,6 @@ def _loader_copier_rule_impl(ctx):
         for file in dep.files.to_list():
             path = file.path
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
-                print("found loader", path)
                 out = ctx.actions.declare_file("loader-output.tar")
                 outs += [out]
                 tar_jar(ctx, file, path, out)
@@ -147,8 +145,6 @@ def _application_copier_rule_impl(ctx):
                 continue
             else:
                 # Probably not a maven dependency.  More likely part of the application
-                print("found app jar", path)
-                print("first", first)
                 if first:
                     out = ctx.actions.declare_file("application-output.tar")
                     outs += [out]
