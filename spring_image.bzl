@@ -63,10 +63,12 @@ def _dependencies_copier_rule_impl(ctx):
                 out_path = "BOOT-INF/lib/" + libdestdir
                 out = ctx.actions.declare_file(out_path)
                 outs += [out]
+                args = ctx.actions.args()
+                args.add_all(path, out)
                 ctx.actions.run_shell(
                     outputs = [out],
                     inputs = depset([file]),
-                    arguments = [path, out.path],
+                    arguments = [args],
                     command = "cp $1 $2",
                 )
     return [
@@ -127,7 +129,20 @@ def tar_jars(ctx, files, out):
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files,
         outputs = [out],
+        # Create an empty tarball, then extract all the jars and append the contents into it.
         command = 'tar cf %s -T /dev/null && for i in %s; do %s xf ${i} && %s tf ${i} | tar rf %s --transform "s,^,BOOT-INF/classes/," -T -; done' % (out.path, " ".join(paths), jar_path, jar_path, out.path),
+    )
+
+def add_spring_components(ctx, files, out):
+    """Find all the spring.components files and concatenate them.  Add them to the out tarball.
+    """
+    java_runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
+    jar_path = "%s/bin/jar" % java_runtime.java_home
+    paths = [f.path for f in files]
+    ctx.actions.run_shell(
+        inputs = ctx.files._jdk + files,
+        outputs = [out],
+        command = "mkdir -p BOOT-INF/classes/META-INF; for i in %s; do %s xf ${i} && cat META-INF/spring.components >> BOOT-INF/classes/META-INF/spring.components; done ; if [ -s BOOT-INF/classes/META-INF/spring.components ]; then tar rf %s BOOT-INF/classes/META-INF/spring.components ; fi" % (" ".join(paths), jar_path, out.path),
     )
 
 def _application_copier_rule_impl(ctx):
@@ -151,6 +166,7 @@ def _application_copier_rule_impl(ctx):
                 jars.append(file)
                 first = False
     tar_jars(ctx, jars, out)
+    add_spring_components(ctx, jars, out)
     return [
         DefaultInfo(
             files = depset(outs),
