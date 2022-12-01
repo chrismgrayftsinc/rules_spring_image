@@ -64,7 +64,7 @@ def _dependencies_copier_rule_impl(ctx):
                 out = ctx.actions.declare_file(out_path)
                 outs += [out]
                 args = ctx.actions.args()
-                args.add_all(path, out)
+                args.add_all(path, out.path)
                 ctx.actions.run_shell(
                     outputs = [out],
                     inputs = depset([file]),
