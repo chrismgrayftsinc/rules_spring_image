@@ -124,7 +124,8 @@ def tar_jars(ctx, files, out):
     java_runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
     jar_path = "%s/bin/jar" % java_runtime.java_home
     paths = [f.path for f in files]
-    spring_components_file = ctx.actions.declare_file("BOOT-INF/classes/META-INF/spring.components")
+    spring_components_file_path = "BOOT-INF/classes/META-INF/spring.components"
+    spring_components_file = ctx.actions.declare_file(spring_components_file_path)
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files,
         outputs = [spring_components_file],
@@ -135,7 +136,7 @@ def tar_jars(ctx, files, out):
         inputs = ctx.files._jdk + files + [spring_components_file],
         outputs = [out],
         # Create an empty tarball, then extract all the jars and append the contents into it.
-        command = 'tar cf {out} -T /dev/null && for i in {all_paths}; do {jar} xf $i && {jar} tf $i | tar rf {out} --transform "s,^,BOOT-INF/classes/," -T -; done && if [ -s {scf} ]; then tar rf {out} {scf}; fi'.format(out = out.path, all_paths = " ".join(paths), jar = jar_path, scf = spring_components_file.path),
+        command = 'tar cf {out} -T /dev/null && for i in {all_paths}; do {jar} xf $i && {jar} tf $i | tar rf {out} --transform "s,^,BOOT-INF/classes/," -T -; done && if [ -s {scf} ]; then tar rf {out} {scf}; fi'.format(out = out.path, all_paths = " ".join(paths), jar = jar_path, scf = spring_components_file_path),
     )
 
 def _application_copier_rule_impl(ctx):
