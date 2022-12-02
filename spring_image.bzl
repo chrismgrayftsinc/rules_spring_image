@@ -129,7 +129,7 @@ def tar_jars(ctx, files, out):
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files,
         outputs = [spring_components_file],
-        command = "touch {file}; for i in {all_paths}; do {jar} xf $i && if [-s META-INF/spring.components ]; then cat META-INF/spring.components >> {file}; fi; done".format(file = spring_components_file.path, jar = jar_path, all_paths = " ".join(paths)),
+        command = "touch {file}; for i in {all_paths}; do {jar} xf $i && if [ -s META-INF/spring.components ]; then cat META-INF/spring.components >> {file}; fi; done".format(file = spring_components_file.path, jar = jar_path, all_paths = " ".join(paths)),
     )
 
     ctx.actions.run_shell(
