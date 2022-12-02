@@ -124,17 +124,18 @@ def tar_jars(ctx, files, out):
     java_runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
     jar_path = "%s/bin/jar" % java_runtime.java_home
     paths = [f.path for f in files]
-    out_temp = ctx.actions.declare_file("application-output-temp.tar")
+    spring_components_file = ctx.actions.declare_file("BOOT-INF/classes/META-INF/spring.components")
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files,
-        outputs = [out_temp],
-        # Create an empty tarball, then extract all the jars and append the contents into it.
-        command = 'tar cf %s -T /dev/null && for i in %s; do %s xf ${i} && %s tf ${i} | tar rf %s --transform "s,^,BOOT-INF/classes/," -T -; done' % (out.path, " ".join(paths), jar_path, jar_path, out_temp.path),
+        outputs = [spring_components_file],
+        command = "mkdir -p BOOT-INF/classes/META-INF && touch {file}; for i in %s; do {jar} xf ${i} && cat META-INF/spring.components >> {file}; done".format(file = spring_components_file.path, jar = jar_path),
     )
+
     ctx.actions.run_shell(
-        inputs = ctx.files._jdk + files + [out_temp],
+        inputs = ctx.files._jdk + files + [spring_components_file],
         outputs = [out],
-        command = "mkdir -p BOOT-INF/classes/META-INF; for i in %s; do %s xf ${i} && cat META-INF/spring.components >> BOOT-INF/classes/META-INF/spring.components; done ; if [ -s BOOT-INF/classes/META-INF/spring.components ]; then tar rf %s BOOT-INF/classes/META-INF/spring.components ; fi && mv %s %s" % (" ".join(paths), jar_path, out_temp.path, out_temp.path, out.path),
+        # Create an empty tarball, then extract all the jars and append the contents into it.
+        command = 'tar cf {out} -T /dev/null && for i in {all_paths}; do {jar} xf ${i} && {jar} tf ${i} | tar rf {out} --transform "s,^,BOOT-INF/classes/," -T -; done && if [ -s {scf} ]; then tar rf {out} {scf}; fi'.format(out = out.path, all_paths = " ".join(paths), jar = jar_path, scf = spring_components_file.path),
     )
 
 def _application_copier_rule_impl(ctx):
