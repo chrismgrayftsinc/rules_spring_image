@@ -63,12 +63,10 @@ def _dependencies_copier_rule_impl(ctx):
                 out_path = "BOOT-INF/lib/" + libdestdir
                 out = ctx.actions.declare_file(out_path)
                 outs += [out]
-                args = ctx.actions.args()
-                args.add_all(path, out)
                 ctx.actions.run_shell(
                     outputs = [out],
                     inputs = depset([file]),
-                    arguments = [args],
+                    arguments = [path, out.path],
                     command = "cp $1 $2",
                 )
     return [
