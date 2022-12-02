@@ -124,23 +124,17 @@ def tar_jars(ctx, files, out):
     java_runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
     jar_path = "%s/bin/jar" % java_runtime.java_home
     paths = [f.path for f in files]
+    out_temp = ctx.actions.declare_file("application-output-temp.tar")
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files,
-        outputs = [out],
+        outputs = [out_temp],
         # Create an empty tarball, then extract all the jars and append the contents into it.
         command = 'tar cf %s -T /dev/null && for i in %s; do %s xf ${i} && %s tf ${i} | tar rf %s --transform "s,^,BOOT-INF/classes/," -T -; done' % (out.path, " ".join(paths), jar_path, jar_path, out.path),
     )
-
-def add_spring_components(ctx, files, out):
-    """Find all the spring.components files and concatenate them.  Add them to the out tarball.
-    """
-    java_runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
-    jar_path = "%s/bin/jar" % java_runtime.java_home
-    paths = [f.path for f in files]
     ctx.actions.run_shell(
-        inputs = ctx.files._jdk + files,
+        inputs = ctx.files._jdk + files + [out_temp],
         outputs = [out],
-        command = "mkdir -p BOOT-INF/classes/META-INF; for i in %s; do %s xf ${i} && cat META-INF/spring.components >> BOOT-INF/classes/META-INF/spring.components; done ; if [ -s BOOT-INF/classes/META-INF/spring.components ]; then tar rf %s BOOT-INF/classes/META-INF/spring.components ; fi" % (" ".join(paths), jar_path, out.path),
+        command = "mkdir -p BOOT-INF/classes/META-INF; for i in %s; do %s xf ${i} && cat META-INF/spring.components >> BOOT-INF/classes/META-INF/spring.components; done ; if [ -s BOOT-INF/classes/META-INF/spring.components ]; then tar rf %s BOOT-INF/classes/META-INF/spring.components ; fi && mv %s %s" % (" ".join(paths), jar_path, out_temp.path, out_temp.path, out.path),
     )
 
 def _application_copier_rule_impl(ctx):
@@ -164,7 +158,6 @@ def _application_copier_rule_impl(ctx):
                 jars.append(file)
                 first = False
     tar_jars(ctx, jars, out)
-    add_spring_components(ctx, jars, out)
     return [
         DefaultInfo(
             files = depset(outs),
