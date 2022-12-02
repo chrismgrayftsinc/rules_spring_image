@@ -129,7 +129,7 @@ def tar_jars(ctx, files, out):
         inputs = ctx.files._jdk + files,
         outputs = [out_temp],
         # Create an empty tarball, then extract all the jars and append the contents into it.
-        command = 'tar cf %s -T /dev/null && for i in %s; do %s xf ${i} && %s tf ${i} | tar rf %s --transform "s,^,BOOT-INF/classes/," -T -; done' % (out.path, " ".join(paths), jar_path, jar_path, out.path),
+        command = 'tar cf %s -T /dev/null && for i in %s; do %s xf ${i} && %s tf ${i} | tar rf %s --transform "s,^,BOOT-INF/classes/," -T -; done' % (out.path, " ".join(paths), jar_path, jar_path, out_temp.path),
     )
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files + [out_temp],
