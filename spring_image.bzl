@@ -37,8 +37,8 @@ def _dependencies_copier_rule_impl(ctx):
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
                 continue
             else:
-                if path.find("external") >= 0 and path.find("maven2", path.find("external")) >= 0:
-                    libdestdir = path[path.find("maven2") + len("maven2"):]
+                if path.find("external") >= 0 and path.find("maven~maven", path.find("external")) >= 0:
+                    libdestdir = path[path.find("maven~maven") + len("maven~maven"):]
                 elif path.find("external") >= 0 and path.find("public", path.find("external")) >= 0:
                     libdestdir = path[path.find("public") + len("public"):]
                 else:
@@ -130,7 +130,7 @@ def tar_jars(ctx, files, out):
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files,
         outputs = [all_paths_file],
-        command = "for i in {all_paths}; do {jar} tf $i | grep -v '/$' >> {out}.tmp; done; sort {out}.tmp | uniq > {out}".format(out = all_paths_file.path, all_paths = " ".join(paths), jar = jar_path),
+        command = "for i in {all_paths}; do {jar} tf $i | grep -v '/$' | grep -v spring.components >> {out}.tmp; done; sort {out}.tmp | uniq > {out}".format(out = all_paths_file.path, all_paths = " ".join(paths), jar = jar_path),
     )
 
     ctx.actions.run_shell(
@@ -150,7 +150,7 @@ def _application_copier_rule_impl(ctx):
             path = file.path
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
                 continue
-            elif path.find("external") >= 0 and path.find("maven2", path.find("external")) >= 0:
+            elif path.find("external") >= 0 and path.find("maven~maven", path.find("external")) >= 0:
                 continue
             elif path.find("external") >= 0 and path.find("public", path.find("external")) >= 0:
                 continue
@@ -191,7 +191,7 @@ def _gen_layers_idx_rule_impl(ctx):
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
                 loader_found = True
                 continue
-            elif path.find("external") >= 0 and path.find("maven2", path.find("external")) >= 0:
+            elif path.find("external") >= 0 and path.find("maven~maven", path.find("external")) >= 0:
                 maven_dependencies_found = True
                 continue
             elif path.find("external") >= 0 and path.find("public", path.find("external")) >= 0:
@@ -324,8 +324,8 @@ def spring_image(
             ":dependencies",
             ":layers_index",
             ":" + gen_loader_rule,
-            ":" + gen_application_rule,
             ":manifest",
+            ":" + gen_application_rule,
         ] + extra_layers,
         base = base,
     )
