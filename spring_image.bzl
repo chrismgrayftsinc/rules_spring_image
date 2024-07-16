@@ -130,7 +130,7 @@ def tar_jars(ctx, files, out):
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files,
         outputs = [all_paths_file],
-        command = "for i in {all_paths}; do {jar} tf $i | grep -v '/$' | grep -v spring.components >> {out}.tmp; done; sort {out}.tmp | uniq > {out}".format(out = all_paths_file.path, all_paths = " ".join(paths), jar = jar_path),
+        command = "for i in {all_paths}; do {jar} tf $i | grep -v '/$' | grep -v spring.components | grep -v MANIFEST.MF >> {out}.tmp; done; sort {out}.tmp | uniq > {out}".format(out = all_paths_file.path, all_paths = " ".join(paths), jar = jar_path),
     )
 
     ctx.actions.run_shell(
@@ -232,6 +232,127 @@ _gen_layers_idx_rule = rule(
     },
 )
 
+def _gen_manifest_rule_impl(ctx):
+    java_runtime = ctx.attr._jdk[java_common.JavaRuntimeInfo]
+    java_home = java_runtime.java_home
+    out = ctx.actions.declare_file(ctx.attr.out)
+    mnemonic = "WriteManifest"
+
+    write_manifest_string = """
+#!/bin/bash
+#
+# Copyright (c) 2017-2021, salesforce.com, inc.
+# All rights reserved.
+# Licensed under the BSD 3-Clause license.
+# For full license text, see LICENSE.txt file in the repo root at https://github.com/salesforce/rules_spring  or https://opensource.org/licenses/BSD-3-Clause
+#
+
+set -e
+
+mainclass={{mainclass}}
+springbootlauncherclass={{springbootlauncherclass}}
+manifestfile={{manifestfile}}
+javabase={{javabase}}
+found_spring_jar=0
+# Looking for the springboot jar injected by springboot.bzl and extracting the version
+
+for var in "$@"
+do
+    # determine the version of spring boot
+    # this little area of the rule has had problems in the past; reconsider whether doing
+    # this is worth it; and certainly carefully review prior issues here before making changes
+    #   Issues: #130, #119, #111
+    $javabase/bin/jar xf $var META-INF/MANIFEST.MF || continue
+    spring_version=$(grep 'Implementation-Version' META-INF/MANIFEST.MF | cut -d : -f2 | tr -d '[:space:]')
+    rm -rf META-INF
+
+    # we do want to validate that the deps include spring boot, and this is a
+    # convenient place to do it, but it is a little misplaced as we are
+    # generating the manifest in this script
+    found_spring_jar=1
+    break
+done
+
+if test $found_spring_jar -ne 1 ; then
+    echo "ERROR: //springboot/write_manifest.sh could not find the spring-boot jar"
+    exit 1
+fi
+
+#get the java -version details
+# todo this isn't the best value to use. it is the version that will be used by the jar tool
+# to package the boot jar but not for compiling the code (java_toolchain)
+java_string=$($javabase/bin/java -version 2>&1)
+
+#get the first line of the version details and get the version
+java_version=$(echo "$java_string" | head -n1 | cut -d ' ' -f 3 | rev | cut -c2- | rev | cut -c2- )
+
+mkdir -p $(dirname $manifestfile)
+echo "Manifest-Version: 1.0" > $manifestfile
+echo "Created-By: Bazel" >> $manifestfile
+echo "Built-By: Bazel" >> $manifestfile
+echo "Main-Class: $springbootlauncherclass" >> $manifestfile
+echo "Spring-Boot-Classes: BOOT-INF/classes/" >> $manifestfile
+echo "Spring-Boot-Lib: BOOT-INF/lib/" >> $manifestfile
+echo "Spring-Boot-Version: $spring_version" >> $manifestfile
+echo "Build-Jdk: $java_version" >> $manifestfile
+echo "Start-Class: $mainclass" >> $manifestfile
+"""
+
+    write_manifest_sh = ctx.actions.declare_file("write_manifest.sh")
+    write_manifest_tpl_sh = ctx.actions.declare_file("write_manifest.tpl.sh")
+    ctx.actions.write(
+        output = write_manifest_tpl_sh,
+        content = write_manifest_string,
+    )
+
+    ctx.actions.expand_template(
+        output = write_manifest_sh,
+        template = write_manifest_tpl_sh,
+        is_executable = True,
+        substitutions = {
+            "{{mainclass}}": ctx.attr.boot_app_class,
+            "{{springbootlauncherclass}}": "org.springframework.boot.loader.JarLauncher",
+            "{{manifestfile}}": out.path,
+            "{{javabase}}": java_home,
+        },
+    )
+
+    ctx.actions.run(
+        executable = write_manifest_sh,
+        outputs = [out],
+        inputs = [
+            dep
+            for src in ctx.attr.srcs
+            for dep in src.files.to_list()
+        ],
+        arguments = [
+            dep.path
+            for src in ctx.attr.srcs
+            for dep in src.files.to_list()
+            if dep.path.find("spring-boot") >= 0 or dep.path.find("spring_boot") >= 0
+        ],
+        tools = [java_runtime.files],
+    )
+    return [
+        DefaultInfo(
+            files = depset([out]),
+            runfiles = ctx.runfiles(files = [out]),
+        ),
+    ]
+
+_gen_manifest_rule = rule(
+    implementation = _gen_manifest_rule_impl,
+    attrs = {
+        "srcs": attr.label_list(),
+        "out": attr.string(),
+        "_jdk": attr.label(
+            default = Label("@bazel_tools//tools/jdk:current_java_runtime"),
+            providers = [java_common.JavaRuntimeInfo],
+        ),
+        "boot_app_class": attr.string(),
+    },
+)
+
 def spring_image(
         name,
         java_library,
@@ -266,14 +387,11 @@ def spring_image(
     )
 
     genmanifest_out = "META-INF/MANIFEST.MF"
-    native.genrule(
+    _gen_manifest_rule(
         name = genmanifest_rule,
         srcs = [":" + dep_aggregator_rule],
-        cmd = "$(location @rules_spring_image//:write_manifest.sh) " + boot_app_class + " org.springframework.boot.loader.JarLauncher $@ $(JAVABASE) $(SRCS)",
-        tools = ["@rules_spring_image//:write_manifest.sh"],
-        outs = [genmanifest_out],
-        tags = tags,
-        toolchains = ["@bazel_tools//tools/jdk:current_host_java_runtime"],
+        out = genmanifest_out,
+        boot_app_class = boot_app_class,
     )
 
     # Create layers and write layers.idx
