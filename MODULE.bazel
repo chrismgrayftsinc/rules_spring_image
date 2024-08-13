@@ -1,0 +1,4 @@
+module(name = "rules_spring_image", repo_name = "rules_spring_image", version = "1.0.0")
+
+bazel_dep(name = "rules_oci", version = "1.7.5")
+bazel_dep(name = "aspect_bazel_lib", version = "2.5.1")
