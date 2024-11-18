@@ -37,8 +37,8 @@ def _dependencies_copier_rule_impl(ctx):
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
                 continue
             else:
-                if path.find("external") >= 0 and path.find("maven~maven", path.find("external")) >= 0:
-                    libdestdir = path[path.find("maven~maven") + len("maven~maven"):]
+                if path.find("external") >= 0 and path.find("maven~", path.find("external")) >= 0:
+                    libdestdir = path[path.find("/"):]
                 elif path.find("external") >= 0 and path.find("public", path.find("external")) >= 0:
                     libdestdir = path[path.find("public") + len("public"):]
                 else:
@@ -150,7 +150,7 @@ def _application_copier_rule_impl(ctx):
             path = file.path
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
                 continue
-            elif path.find("external") >= 0 and path.find("maven~maven", path.find("external")) >= 0:
+            elif path.find("external") >= 0 and path.find("maven~", path.find("external")) >= 0:
                 continue
             elif path.find("external") >= 0 and path.find("public", path.find("external")) >= 0:
                 continue
@@ -191,7 +191,7 @@ def _gen_layers_idx_rule_impl(ctx):
             if path.find("spring-boot-loader") >= 0 or path.find("spring_boot_loader") >= 0:
                 loader_found = True
                 continue
-            elif path.find("external") >= 0 and path.find("maven~maven", path.find("external")) >= 0:
+            elif path.find("external") >= 0 and path.find("maven~", path.find("external")) >= 0:
                 maven_dependencies_found = True
                 continue
             elif path.find("external") >= 0 and path.find("public", path.find("external")) >= 0:
