@@ -136,6 +136,7 @@ def tar_jars(ctx, files, out):
     ctx.actions.run_shell(
         inputs = ctx.files._jdk + files + [spring_components_file, all_paths_file],
         outputs = [out],
+        use_default_shell_env = True, # For chrismgrayftsinc/rules_spring_image#4
         # Create an empty tarball, then extract all the jars and append the contents into it.
         # TODO: get rid of the hardcoded bazel-out path in the first transform.
         command = 'tar cf {out} -T /dev/null && if [ -s {scf} ]; then tar rhf {out} --transform "s,bazel-out/.*/bin/,BOOT-INF/classes/META-INF/," {scf}; fi && for i in {all_paths}; do {jar} xf $i; done && cat {all_paths_file} | tar rf {out} --transform "s,^,BOOT-INF/classes/," -T -'.format(out = out.path, all_paths = " ".join(paths), jar = jar_path, scf = spring_components_file.path, all_paths_file = all_paths_file.path),
